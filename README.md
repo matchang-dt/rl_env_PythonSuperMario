@@ -52,6 +52,22 @@ for i in range(test_episodes):
 
 ```
 
+# Modified Points of Game
+* Made speed of time decrease faster
+* Aspect and resolution of display
+* Changed animation control from real-time-based to frame-based
+* Fixed viewport misalignment in various situations (e.g. during transformation)
+* Changed so that which power-up item appears depends on Mario's status
+* Jump height during dash jump
+* Changed behavior when jumping so that you are not affected by gravity for a certain period of time while pressing A
+* This enabled adjustment jump height
+* Changed fireball firing from a cool time system to a limit of two shots on screen
+* Disabled firing fireball during crouching
+* Enabled crouching jump
+* Made hitbox of Mario a bit narrower
+* Made enemies turn their direction when they contact another enemy
+* Enabled sliding during crouching after dush
+* Trajectry of fireballs
 <!-- # How to Play
 * use LEFT/RIGHT/DOWN key to control player
 * use key 'a' to jump
