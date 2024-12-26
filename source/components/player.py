@@ -2,10 +2,17 @@ __author__ = 'marble_xu'
 
 import os
 import json
+import sys
+import os
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
-from ..components import powerup
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
+from components import powerup
 
 class Player(pg.sprite.Sprite):
     def __init__(self, player_name):
@@ -25,8 +32,14 @@ class Player(pg.sprite.Sprite):
             
         self.frame_index = 0
         self.state = c.WALK
+        self.transition_state = c.NEUTRAL
         self.image = self.right_frames[self.frame_index]
         self.rect = self.image.get_rect()
+        self.fireball_count = 0
+        self.jump_limit = 9
+        self.collision_range = pg.sprite.Sprite()
+        self.collision_range.rect = pg.Rect(self.rect.x + 2, self.rect.y + 1, self.rect.w - 4, self.rect.h - 2)
+        self.collision_range.state = None
 
     def restart(self):
         '''restart after player is dead or go to next level'''
@@ -38,20 +51,25 @@ class Player(pg.sprite.Sprite):
             self.right_frames = self.small_normal_frames[0]
             self.left_frames = self.small_normal_frames[1]
         self.state = c.STAND
+        self.fireball_count = 0
 
     def load_data(self):
         player_file = str(self.player_name) + '.json'
-        file_path = os.path.join('source', 'data', 'player', player_file)
+        file_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'player', player_file)
         f = open(file_path)
         self.player_data = json.load(f)
 
     def setup_timer(self):
         self.walking_timer = 0
+        self.walking_first = True
         self.death_timer = 0
         self.flagpole_timer = 0
         self.transition_timer = 0
+        self.transition_first = True
         self.hurt_invincible_timer = 0
+        self.hurt_first = True
         self.invincible_timer = 0
+        self.invincible_first = True
         self.last_fireball_time = 0
 
     def setup_state(self):
@@ -75,11 +93,14 @@ class Player(pg.sprite.Sprite):
         self.max_y_vel = speed[c.MAX_Y_VEL]
         self.walk_accel = speed[c.WALK_ACCEL]
         self.run_accel = speed[c.RUN_ACCEL]
+        self.initial_speed = speed[c.INITIAL_SPEED]
         self.jump_vel = speed[c.JUMP_VEL]
+        self.jump_threshold = self.max_run_vel * 0.9
         
         self.gravity = c.GRAVITY
         self.max_x_vel = self.max_walk_vel
         self.x_accel = self.walk_accel
+        self.break_accel = speed['break_accel']
 
     def load_images(self):
         sheet = setup.GFX['mario_bros']
@@ -137,7 +158,13 @@ class Player(pg.sprite.Sprite):
         self.animation()
 
     def handle_state(self, keys, fire_group):
-        if self.state == c.STAND:
+        if self.transition_state == c.SMALL_TO_BIG:
+            self.changing_to_big()
+        elif self.transition_state == c.BIG_TO_SMALL:
+            self.changing_to_small()
+        elif self.transition_state == c.BIG_TO_FIRE:
+            self.changing_to_fire()
+        elif self.state == c.STAND:
             self.standing(keys, fire_group)
         elif self.state == c.WALK:
             self.walking(keys, fire_group)
@@ -171,11 +198,11 @@ class Player(pg.sprite.Sprite):
                 self.state = c.STAND
 
     def check_to_allow_jump(self, keys):
-        if not keys[tools.keybinding['jump']]:
+        if not keys[4]:
             self.allow_jump = True
     
     def check_to_allow_fireball(self, keys):
-        if not keys[tools.keybinding['action']]:
+        if not keys[3]:
             self.allow_fireball = True
 
     def standing(self, keys, fire_group):
@@ -186,27 +213,33 @@ class Player(pg.sprite.Sprite):
         self.x_vel = 0
         self.y_vel = 0
         
-        if keys[tools.keybinding['action']]:
-            if self.fire and self.allow_fireball:
+        if keys[3]:
+            if self.fire and self.allow_fireball and not not keys[1]:
                 self.shoot_fireball(fire_group)
 
-        if keys[tools.keybinding['down']]:
+        if keys[1]:
             self.update_crouch_or_not(True)
 
-        if keys[tools.keybinding['left']]:
+        if keys[0]:
             self.facing_right = False
             self.update_crouch_or_not()
             self.state = c.WALK
-        elif keys[tools.keybinding['right']]:
+        elif keys[2]:
             self.facing_right = True
             self.update_crouch_or_not()
             self.state = c.WALK
-        elif keys[tools.keybinding['jump']]:
+        elif keys[4]:
             if self.allow_jump:
+                if not keys[1] or not self.big:
+                    self.update_crouch_or_not()
+                else:
+                    self.update_crouch_or_not(True)
                 self.state = c.JUMP
                 self.y_vel = self.jump_vel
-        
-        if not keys[tools.keybinding['down']]:
+                self.jump_step = self.jump_limit
+                self.jump_start = self.current_time
+
+        if not keys[1]:
             self.update_crouch_or_not()
 
     def update_crouch_or_not(self, isDown=False):
@@ -228,6 +261,7 @@ class Player(pg.sprite.Sprite):
         self.rect.bottom = bottom
         self.rect.x = left
         self.frame_index = frame_index
+        self.collision_range.rect = pg.Rect(self.rect.x + 2, self.rect.y + 1, self.rect.w - 4, self.rect.h - 2)
 
     def walking(self, keys, fire_group):
         self.check_to_allow_jump(keys)
@@ -236,56 +270,66 @@ class Player(pg.sprite.Sprite):
         if self.frame_index == 0:
             self.frame_index += 1
             self.walking_timer = self.current_time
-        elif (self.current_time - self.walking_timer >
-                    self.calculate_animation_speed()):
+            self.walking_step = 0
+        elif self.walking_step > self.calculate_animation_speed():
             if self.frame_index < 3:
                 self.frame_index += 1
             else:
                 self.frame_index = 1
-            self.walking_timer = self.current_time
+            self.walking_step = 0
+        self.walking_step += 1
         
-        if keys[tools.keybinding['action']]:
+        if keys[3]:
             self.max_x_vel = self.max_run_vel
             self.x_accel = self.run_accel
-            if self.fire and self.allow_fireball:
+            if self.fire and self.allow_fireball and not keys[1]:
                 self.shoot_fireball(fire_group)
         else:
             self.max_x_vel = self.max_walk_vel
             self.x_accel = self.walk_accel
         
-        if keys[tools.keybinding['jump']]:
+        if keys[4]:
             if self.allow_jump:
                 self.state = c.JUMP
-                if abs(self.x_vel) > 4:
-                    self.y_vel = self.jump_vel - .5
+                self.jump_start = self.current_time
+                if abs(self.x_vel) > self.jump_threshold:
+                    self.jump_step = self.jump_limit + 4
+                    self.y_vel = self.jump_vel
                 else:
+                    self.jump_step = self.jump_limit
                     self.y_vel = self.jump_vel
                 
 
-        if keys[tools.keybinding['left']]:
+        if keys[0]:
             self.facing_right = False
+            self.update_crouch_or_not()
             if self.x_vel > 0:
                 self.frame_index = 5
                 self.x_accel = c.SMALL_TURNAROUND
             
             self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel, True)
-        elif keys[tools.keybinding['right']]:
+        elif keys[2]:
             self.facing_right = True
+            self.update_crouch_or_not()
             if self.x_vel < 0:
                 self.frame_index = 5
                 self.x_accel = c.SMALL_TURNAROUND
             
             self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel)
         else:
+            if keys[1]:
+                self.update_crouch_or_not(True)
+            else:
+                self.update_crouch_or_not()
             if self.facing_right:
                 if self.x_vel > 0:
-                    self.x_vel -= self.x_accel
+                    self.x_vel -= self.break_accel
                 else:
                     self.x_vel = 0
                     self.state = c.STAND
             else:
                 if self.x_vel < 0:
-                    self.x_vel += self.x_accel
+                    self.x_vel += self.break_accel
                 else:
                     self.x_vel = 0
                     self.state = c.STAND
@@ -293,40 +337,53 @@ class Player(pg.sprite.Sprite):
     def jumping(self, keys, fire_group):
         """ y_vel value: positive is down, negative is up """
         self.check_to_allow_fireball(keys)
-        
         self.allow_jump = False
-        self.frame_index = 4
+        self.jump_step -= 1
+
+        if not self.crouching:
+            self.frame_index = 4
         self.gravity = c.JUMP_GRAVITY
-        self.y_vel += self.gravity
-        
-        if self.y_vel >= 0 and self.y_vel < self.max_y_vel:
+
+        if keys[2]:
+            self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel)
+        elif keys[0]:
+            self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel, True)
+        if not keys[4] or self.jump_step < 1:
             self.gravity = c.GRAVITY
             self.state = c.FALL
 
-        if keys[tools.keybinding['right']]:
+        if keys[3]:
+            if self.fire and self.allow_fireball and not self.crouching:
+                self.shoot_fireball(fire_group)
+
+    def crouching_jumping(self, keys, fire_group):
+        """ y_vel value: positive is down, negative is up """
+        self.check_to_allow_fireball(keys)
+        
+        self.allow_jump = False
+        self.gravity = c.JUMP_GRAVITY
+        self.jump_step -= 1
+
+        if keys[2]:
             self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel)
-        elif keys[tools.keybinding['left']]:
+        elif keys[0]:
             self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel, True)
         
-        if not keys[tools.keybinding['jump']]:
+        if not keys[4] or self.jump_step < 1:
             self.gravity = c.GRAVITY
             self.state = c.FALL
-        
-        if keys[tools.keybinding['action']]:
-            if self.fire and self.allow_fireball:
-                self.shoot_fireball(fire_group)
 
     def falling(self, keys, fire_group):
         self.check_to_allow_fireball(keys)
         self.y_vel = self.cal_vel(self.y_vel, self.max_y_vel, self.gravity)
         
-        if keys[tools.keybinding['right']]:
+        if keys[2]:
             self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel)
-        elif keys[tools.keybinding['left']]:
+        elif keys[0]:
             self.x_vel = self.cal_vel(self.x_vel, self.max_x_vel, self.x_accel, True)
         
-        if keys[tools.keybinding['action']]:
-            if self.fire and self.allow_fireball:
+        if keys[3]:
+            if self.fire and self.allow_fireball and not self.crouching:
                 self.shoot_fireball(fire_group)
     
     def jumping_to_death(self):
@@ -342,10 +399,13 @@ class Player(pg.sprite.Sprite):
             new_vel = vel * -1
         else:
             new_vel = vel
-        if (new_vel + accel) < max_vel:
+        tmp_vel = new_vel + accel 
+        if tmp_vel < max_vel:
             new_vel += accel
-        else:
-            new_vel = max_vel
+        elif tmp_vel < self.max_run_vel:
+            new_vel -= self.break_accel
+        if new_vel > self.max_run_vel:
+            new_vel = self.max_run_vel
         if isNegative:
             return new_vel * -1
         else:
@@ -353,20 +413,20 @@ class Player(pg.sprite.Sprite):
 
     def calculate_animation_speed(self):
         if self.x_vel == 0:
-            animation_speed = 130
+            animation_speed = 13
         elif self.x_vel > 0:
-            animation_speed = 130 - (self.x_vel * 13)
+            animation_speed = 13 - self.x_vel * 3
         else:
-            animation_speed = 130 - (self.x_vel * 13 * -1)
+            animation_speed = 13 + self.x_vel * 3
         return animation_speed
 
     def shoot_fireball(self, powerup_group):
-        if (self.current_time - self.last_fireball_time) > 500:
+        if self.fireball_count < 2:
             self.allow_fireball = False
             powerup_group.add(powerup.FireBall(self.rect.right, 
                             self.rect.y, self.facing_right))
-            self.last_fireball_time = self.current_time
             self.frame_index = 6
+            self.fireball_count += 1
 
     def flag_pole_sliding(self):
         self.state = c.FLAGPOLE
@@ -402,44 +462,47 @@ class Player(pg.sprite.Sprite):
             self.walking_timer = self.current_time
 
     def changing_to_big(self):
-        timer_list = [135, 200, 365, 430, 495, 560, 625, 690, 755, 820, 885]
+        step_list = [8, 12, 22, 26, 30, 34, 38, 42, 46, 50, 56]
         # size value 0:small, 1:middle, 2:big
         size_list = [1, 0, 1, 0, 1, 2, 0, 1, 2, 0, 2]
         frames = [(self.small_normal_frames, 0), (self.small_normal_frames, 7),
                     (self.big_normal_frames, 0)]
-        if self.transition_timer == 0:
+        if self.transition_first:
             self.big = True
             self.change_index = 0
-            self.transition_timer = self.current_time
-        elif (self.current_time - self.transition_timer) > timer_list[self.change_index]:
-            if (self.change_index + 1) >= len(timer_list):
+            self.transition_first = False
+            self.transition_step = 0
+        elif self.transition_step >= step_list[self.change_index]:
+            if (self.change_index + 1) >= len(step_list):
                 # player becomes big
-                self.transition_timer = 0
+                self.transition_first = True
                 self.set_player_image(self.big_normal_frames, 0)
-                self.state = c.WALK
+                self.transition_state = c.NEUTRAL
                 self.right_frames = self.right_big_normal_frames
                 self.left_frames = self.left_big_normal_frames
             else:
                 frame, frame_index = frames[size_list[self.change_index]]
                 self.set_player_image(frame, frame_index)
             self.change_index += 1
+        self.transition_step += 1
 
     def changing_to_small(self):
-        timer_list = [265, 330, 395, 460, 525, 590, 655, 720, 785, 850, 915]
+        step_list = [16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56]
         # size value 0:big, 1:middle, 2:small
         size_list = [0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2]
         frames = [(self.big_normal_frames, 4), (self.big_normal_frames, 8),
                     (self.small_normal_frames, 8)]
 
-        if self.transition_timer == 0:
+        if self.transition_first:
             self.change_index = 0
-            self.transition_timer = self.current_time
-        elif (self.current_time - self.transition_timer) > timer_list[self.change_index]:
-            if (self.change_index + 1) >= len(timer_list):
+            self.transition_first = False
+            self.transition_step = 0
+        elif self.transition_step >= step_list[self.change_index]:
+            if (self.change_index + 1) >= len(step_list):
                 # player becomes small
-                self.transition_timer = 0
+                self.transition_first = True
                 self.set_player_image(self.small_normal_frames, 0)
-                self.state = c.WALK
+                self.transition_state = c.NEUTRAL
                 self.big = False
                 self.fire = False
                 self.hurt_invincible = True
@@ -449,30 +512,33 @@ class Player(pg.sprite.Sprite):
                 frame, frame_index = frames[size_list[self.change_index]]
                 self.set_player_image(frame, frame_index)
             self.change_index += 1
+        self.transition_step += 1
 
     def changing_to_fire(self):
-        timer_list = [65, 195, 260, 325, 390, 455, 520, 585, 650, 715, 780, 845, 910, 975]
+        step_list = [4, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60]
         # size value 0:fire, 1:big green, 2:big red, 3:big black
         size_list = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1]
         frames = [(self.big_fire_frames, 3), (self.big_normal_frames, 3),
                     (self.big_fire_frames, 3), (self.big_normal_frames, 3)]
                     
-        if self.transition_timer == 0:
+        if self.transition_first:
             self.change_index = 0
-            self.transition_timer = self.current_time
-        elif (self.current_time - self.transition_timer) > timer_list[self.change_index]:
-            if (self.change_index + 1) >= len(timer_list):
+            self.transition_first = False
+            self.transition_step = 0
+        elif self.transition_step >= step_list[self.change_index]:
+            if (self.change_index + 1) >= len(step_list):
                 # player becomes fire
-                self.transition_timer = 0
+                self.transition_first = True
                 self.set_player_image(self.big_fire_frames, 3)
                 self.fire = True
-                self.state = c.WALK
+                self.transition_state = c.NEUTRAL
                 self.right_frames = self.right_big_fire_frames
                 self.left_frames = self.left_big_fire_frames
             else:
                 frame, frame_index = frames[size_list[self.change_index]]
                 self.set_player_image(frame, frame_index)
             self.change_index += 1
+        self.transition_step += 1
 
     def set_player_image(self, frames, frame_index):
         self.frame_index = frame_index
@@ -487,48 +553,58 @@ class Player(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.bottom = bottom
         self.rect.centerx = centerx
+        self.collision_range.rect = pg.Rect(self.rect.x + 2, self.rect.y + 1, self.rect.w - 4, self.rect.h - 2)
 
     def check_if_hurt_invincible(self):
         if self.hurt_invincible:
-            if self.hurt_invincible_timer == 0:
-                self.hurt_invincible_timer = self.current_time
-                self.hurt_invincible_timer2 = self.current_time
-            elif (self.current_time - self.hurt_invincible_timer) < 2000:
-                if (self.current_time - self.hurt_invincible_timer2) < 35:
+            if self.hurt_first:
+                self.hurt_step = 0
+                self.flash_step = 0
+                self.hurt_first = False
+            elif self.hurt_step < 121:
+                if self.flash_step < 3:
                     self.image.set_alpha(0)
-                elif (self.current_time - self.hurt_invincible_timer2) < 70:
+                elif self.flash_step < 4:
                     self.image.set_alpha(255)
-                    self.hurt_invincible_timer2 = self.current_time
+                else:
+                    self.flash_step = 0
+                self.hurt_step += 1
+                self.flash_step += 1
             else:
                 self.hurt_invincible = False
-                self.hurt_invincible_timer = 0
+                self.hurt_first = True
                 for frames in self.all_images:
                     for image in frames:
                         image.set_alpha(255)
 
     def check_if_invincible(self):
         if self.invincible:
-            if self.invincible_timer == 0:
-                self.invincible_timer = self.current_time
-                self.invincible_timer2 = self.current_time
-            elif (self.current_time - self.invincible_timer) < 10000:
-                if (self.current_time - self.invincible_timer2) < 35:
+            if self.invincible_first:
+                self.invincible_step = 0
+                self.flash_step = 0
+                self.invincible_first = False
+            elif self.invincible_step < 361:
+                if self.flash_step < 3:
                     self.image.set_alpha(0)
-                elif (self.current_time - self.invincible_timer2) < 70:
+                elif self.flash_step < 4:
                     self.image.set_alpha(255)
-                    self.invincible_timer2 = self.current_time
-            elif (self.current_time - self.invincible_timer) < 12000:
-                if (self.current_time - self.invincible_timer2) < 100:
+                else:
+                    self.flash_step = 0
+            elif self.invincible_step < 481:
+                if self.flash_step < 7:
                     self.image.set_alpha(0)
-                elif (self.current_time - self.invincible_timer2) < 200:
+                elif self.flash_step < 12:
                     self.image.set_alpha(255)
-                    self.invincible_timer2 = self.current_time
+                else:
+                    self.flash_step = 0
             else:
                 self.invincible = False
-                self.invincible_timer = 0
+                self.invincible_first = True
                 for frames in self.all_images:
                     for image in frames:
                         image.set_alpha(255)
+            self.invincible_step += 1
+            self.flash_step += 1
 
     def animation(self):
         if self.facing_right:

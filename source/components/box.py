@@ -1,14 +1,21 @@
 __author__ = 'marble_xu'
 
+import sys
+import os
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
 from . import coin, powerup
 
 class Box(pg.sprite.Sprite):
     def __init__(self, x, y, type, group=None, name=c.MAP_BOX):
         pg.sprite.Sprite.__init__(self)
-        
+
         self.frames = []
         self.frame_index = 0
         self.load_frames()
@@ -19,6 +26,7 @@ class Box(pg.sprite.Sprite):
 
         self.rest_height = y
         self.animation_timer = 0
+        self.anime_step = 0
         self.first_half = True   # First half of animation cycle
         self.state = c.RESTING
         self.y_vel = 0
@@ -35,34 +43,35 @@ class Box(pg.sprite.Sprite):
             self.frames.append(tools.get_image(sheet, *frame_rect, 
                             c.BLACK, c.BRICK_SIZE_MULTIPLIER))
     
-    def update(self, game_info):
+    def update(self, game_info, player):
         self.current_time = game_info[c.CURRENT_TIME]
         if self.state == c.RESTING:
             self.resting()
         elif self.state == c.BUMPED:
-            self.bumped()
+            self.bumped(player)
 
     def resting(self):
-        time_list = [375, 125, 125, 125]
-        if (self.current_time - self.animation_timer) > time_list[self.frame_index]:
+        step_list = [22, 8, 8, 8]
+        if self.anime_step > step_list[self.frame_index]:
             self.frame_index += 1
             if self.frame_index == 4:
-                self.frame_index = 0
-            self.animation_timer = self.current_time
-
+                self.frame_index = 0     
+            self.anime_step = 0
+        self.anime_step += 1
         self.image = self.frames[self.frame_index]
     
-    def bumped(self):
+    def bumped(self, player):
         self.rect.y += self.y_vel
         self.y_vel += self.gravity
         
         if self.rect.y > self.rest_height + 5:
             self.rect.y = self.rest_height
             self.state = c.OPENED
-            if self.type == c.TYPE_MUSHROOM:
-                self.group.add(powerup.Mushroom(self.rect.centerx, self.rect.y))
-            elif self.type == c.TYPE_FIREFLOWER:
-                self.group.add(powerup.FireFlower(self.rect.centerx, self.rect.y))
+            if self.type == c.TYPE_POWERUP:
+                if not player.big:
+                    self.group.add(powerup.Mushroom(self.rect.centerx, self.rect.y))
+                else:
+                    self.group.add(powerup.FireFlower(self.rect.centerx, self.rect.y))                        
             elif self.type == c.TYPE_LIFEMUSHROOM:
                 self.group.add(powerup.LifeMushroom(self.rect.centerx, self.rect.y))
         self.frame_index = 4

@@ -1,8 +1,15 @@
 __author__ = 'marble_xu'
 
+import sys
+import os
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
 
 class Collider(pg.sprite.Sprite):
     def __init__(self, x, y, width, height, name):
@@ -14,6 +21,50 @@ class Collider(pg.sprite.Sprite):
         self.name = name
         if c.DEBUG:
             self.image.fill(c.RED)
+
+class Ground(pg.sprite.Sprite):
+    def __init__(self, x, y, width, height):
+        pg.sprite.Sprite.__init__(self)
+        self.rect = pg.Rect(x , y , width, height)
+        self.image = pg.Surface((width, height)).convert()
+        self.name = 'ground'
+        tile_rect = (0, 0, 16, 16)
+        one_tile = tools.get_image(setup.GFX['tile_set'], *tile_rect, c.BLACK, 1)
+        row = height // 16
+        column = width // 16
+        for i in range(row):
+            for j in range(column):
+                self.image.blit(one_tile, (j * 16, i * 16))
+
+class Step(pg.sprite.Sprite):
+    def __init__(self, x, y, num, direction):
+        pg.sprite.Sprite.__init__(self)
+        if direction:
+            self.rect = pg.Rect(x, y, 16, 16*num)
+            self.image = pg.Surface((16, 16*num)).convert()
+        else:
+            self.rect = pg.Rect(x, y, 16*num, 16)
+            self.image = pg.Surface((16*num, 16)).convert()
+        self.rect.x = x
+        self.rect.y = y
+        self.name = 'step'
+        step_rect = (0, 16, 16, 16)
+        one_tile = tools.get_image(setup.GFX['tile_set'], *step_rect, c.BLACK, 1)
+        for i in range(num):
+            if direction:
+                self.image.blit(one_tile, (0, i*16))
+            else:
+                self.image.blit(one_tile, (i*16, 0))
+
+class Closedbox(pg.sprite.Sprite):
+    def __init__(self, x, y):
+        pg.sprite.Sprite.__init__(self)
+        self.name = 'closedbox'
+        closedbox_rect = (432, 0, 16, 16)
+        self.image = tools.get_image(setup.GFX['tile_set'], *closedbox_rect, c.BLACK, 1)
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
 
 class Checkpoint(pg.sprite.Sprite):
     def __init__(self, x, y, width, height, type, enemy_groupid=0, map_index=0, name=c.MAP_CHECKPOINT):

@@ -1,8 +1,15 @@
 __author__ = 'marble_xu'
 
+import sys
+import os
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
 from . import stuff
 
 class Powerup(stuff.Stuff):
@@ -25,7 +32,9 @@ class Powerup(stuff.Stuff):
         self.rect.y += self.y_vel
         self.check_y_collisions(level)
         
-        if self.rect.x <= 0:
+        if self.rect.right <= level.viewport.x - 32:
+            self.kill()
+        elif self.rect.left >= level.viewport.right + 32:
             self.kill()
         elif self.rect.y > (level.viewport.bottom):
             self.kill()
@@ -64,7 +73,7 @@ class Mushroom(Powerup):
         Powerup.__init__(self, x, y, setup.GFX[c.ITEM_SHEET],
                 [(0, 0, 16, 16)], c.SIZE_MULTIPLIER)
         self.type = c.TYPE_MUSHROOM
-        self.speed = 2
+        self.speed = 1
 
     def update(self, game_info, level):
         if self.state == c.REVEAL:
@@ -88,7 +97,7 @@ class LifeMushroom(Mushroom):
         Powerup.__init__(self, x, y, setup.GFX[c.ITEM_SHEET],
                 [(16, 0, 16, 16)], c.SIZE_MULTIPLIER)
         self.type = c.TYPE_LIFEMUSHROOM
-        self.speed = 2
+        self.speed = 1
 
 class FireFlower(Powerup):
     def __init__(self, x, y):
@@ -124,7 +133,7 @@ class Star(Powerup):
                     frame_rect_list, c.SIZE_MULTIPLIER)
         self.type = c.TYPE_STAR
         self.gravity = .4
-        self.speed = 5
+        self.speed = 1
         
     def update(self, game_info, level):
         self.current_time = game_info[c.CURRENT_TIME]
@@ -172,22 +181,25 @@ class FireBall(Powerup):
         Powerup.__init__(self, x, y, setup.GFX[c.ITEM_SHEET],
                     frame_rect_list, c.SIZE_MULTIPLIER)
         self.type = c.TYPE_FIREBALL
-        self.y_vel = 10
-        self.gravity = .9
+        self.y_vel = 5
+        self.gravity = .4
         self.state = c.FLYING
+        self.first_bound = False
         self.rect.right = x
+        self.real_y = self.rect.y
         if facing_right:
             self.direction = c.RIGHT
-            self.x_vel = 12
+            self.x_vel = 5
         else:
             self.direction = c.LEFT
-            self.x_vel = -12
+            self.x_vel = -5
 
     def update(self, game_info, level):
         self.current_time = game_info[c.CURRENT_TIME]
         
         if self.state == c.FLYING or self.state == c.BOUNCING:
-            self.y_vel += self.gravity
+            if self.first_bound:
+                self.y_vel += self.gravity            
             if (self.current_time - self.animate_timer) > 200:
                 if self.frame_index < 3:
                     self.frame_index += 1
@@ -200,12 +212,30 @@ class FireBall(Powerup):
                 if self.frame_index < 6:
                     self.frame_index += 1
                 else:
+                    level.player.fireball_count -= 1
                     self.kill()
                 self.animate_timer = self.current_time
         
-        
         self.animation()
-    
+
+    def update_position(self, level):
+        self.rect.x += self.x_vel
+        self.check_x_collisions(level)
+        
+        self.real_y += self.y_vel
+        self.rect.y = round(self.real_y)
+        self.check_y_collisions(level)
+
+        if self.rect.right <= level.viewport.x - 32:
+            level.player.fireball_count -= 1
+            self.kill()
+        elif self.rect.left >= level.viewport.right + 32:
+            level.player.fireball_count -= 1
+            self.kill()
+        elif self.rect.y > (level.viewport.bottom):
+            level.player.fireball_count -= 1
+            self.kill()
+
     def check_x_collisions(self, level):
         sprite_group = pg.sprite.Group(level.ground_step_pipe_group,
                             level.brick_group, level.box_group)
@@ -224,11 +254,12 @@ class FireBall(Powerup):
                 self.change_to_explode()
             else:
                 self.rect.bottom = sprite.rect.y
-                self.y_vel = -8
+                self.first_bound = True
+                self.y_vel = -3.8
                 if self.direction == c.RIGHT:
-                    self.x_vel = 15
+                    self.x_vel = 5
                 else:
-                    self.x_vel = -15
+                    self.x_vel = -5
                 self.state = c.BOUNCING
         elif enemy:
             if (enemy.name != c.FIRESTICK) :
@@ -240,4 +271,3 @@ class FireBall(Powerup):
     def change_to_explode(self):
         self.frame_index = 4
         self.state = c.EXPLODING
-

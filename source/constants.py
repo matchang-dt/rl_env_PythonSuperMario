@@ -4,9 +4,12 @@ DEBUG = False
 DEBUG_START_X = 110
 DEBUG_START_y = 538
 
-SCREEN_HEIGHT = 600
-SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 480
+SCREEN_WIDTH = 512
 SCREEN_SIZE = (SCREEN_WIDTH,SCREEN_HEIGHT)
+GAME_HEIGHT = 240
+GAME_WIDTH = 256
+SCREEN_SCALE = 2
 
 ORIGINAL_CAPTION = "Super Mario Bros"
 
@@ -19,7 +22,7 @@ RED          = (255,   0,   0)
 GREEN        = (  0, 255,   0)
 FOREST_GREEN = ( 31, 162,  35)
 BLUE         = (  0,   0, 255)
-SKY_BLUE     = ( 39, 145, 251)
+SKY_BLUE     = ( 92, 148, 252)
 YELLOW       = (255, 255,   0)
 ORANGE       = (255, 128,   0)
 PURPLE       = (255,   0, 255)
@@ -28,14 +31,15 @@ BLACK        = (  0,   0,   0)
 NEAR_BLACK   = ( 19,  15,  48)
 COMBLUE      = (233, 232, 255)
 GOLD         = (255, 215,   0)
+BROWN        = (156,  74,   0)
 
 BGCOLOR = WHITE
 
 
-SIZE_MULTIPLIER = 2.5
-BRICK_SIZE_MULTIPLIER = 2.69
-BACKGROUND_MULTIPLER = 2.679
-GROUND_HEIGHT = SCREEN_HEIGHT - 62
+SIZE_MULTIPLIER = 1
+BRICK_SIZE_MULTIPLIER = 1
+BACKGROUND_MULTIPLER = 1
+GROUND_HEIGHT = SCREEN_HEIGHT
 
 GAME_TIME_OUT = 301
 
@@ -73,6 +77,7 @@ PIPE_TYPE_HORIZONTAL = 2        # can go right in the pipe
 MAP_STEP = 'step'
 MAP_BRICK = 'brick'
 BRICK_NUM = 'brick_num'
+MAP_CLOSED_BLOCK = 'closedbox'
 TYPE_NONE = 0
 TYPE_COIN = 1
 TYPE_STAR = 2
@@ -81,6 +86,7 @@ TYPE_MUSHROOM = 3
 TYPE_FIREFLOWER = 4
 TYPE_FIREBALL = 5
 TYPE_LIFEMUSHROOM = 6
+TYPE_POWERUP = 7
 MAP_ENEMY = 'enemy'
 ENEMY_TYPE_GOOMBA = 0
 ENEMY_TYPE_KOOPA = 1
@@ -140,6 +146,7 @@ FLY = 'fly'
 SMALL_TO_BIG = 'small to big'
 BIG_TO_FIRE = 'big to fire'
 BIG_TO_SMALL = 'big to small'
+NEUTRAL = 'neutral'
 FLAGPOLE = 'flag pole'
 WALK_AUTO = 'walk auto'     # not handle key input in this state
 END_OF_LEVEL_FALL = 'end of level fall'
@@ -149,15 +156,16 @@ UP_OUT_PIPE = 'up out of pipe'
 
 #PLAYER FORCES
 PLAYER_SPEED = 'speed'
+INITIAL_SPEED = 'initial_speed'
 WALK_ACCEL = 'walk_accel'
 RUN_ACCEL = 'run_accel'
 JUMP_VEL = 'jump_velocity'
 MAX_Y_VEL = 'max_y_velocity'
 MAX_RUN_SPEED = 'max_run_speed'
 MAX_WALK_SPEED = 'max_walk_speed'
-SMALL_TURNAROUND = .35
-JUMP_GRAVITY = .31
-GRAVITY = 1.01
+SMALL_TURNAROUND = .1
+JUMP_GRAVITY = .3
+GRAVITY = .3
 
 #LIST of ENEMIES
 GOOMBA = 'goomba'

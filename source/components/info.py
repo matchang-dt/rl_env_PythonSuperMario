@@ -1,9 +1,17 @@
 __author__ = 'marble_xu'
 
+import os
+import sys
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
-from . import coin
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+sys.path.append(cwd)
+
+import setup, tools
+import constants as c
+import coin
 
 class Character(pg.sprite.Sprite):
     def __init__(self, image):
@@ -17,6 +25,8 @@ class Info():
         self.total_lives = game_info[c.LIVES]
         self.state = state
         self.game_info = game_info
+        self.step_count = 0
+        self.step_per_time = 26 # 60 * 0.43
         
         self.create_font_image_dict()
         self.create_info_labels()
@@ -159,18 +169,13 @@ class Info():
         self.handle_level_state(level_info)
     
     def handle_level_state(self, level_info):
-        self.score = level_info[c.SCORE]
-        self.update_text(self.score_text, self.score)
-        self.update_text(self.coin_count_text, level_info[c.COIN_TOTAL])
-        self.update_text(self.stage_label, level_info[c.LEVEL_NUM])
-        self.flashing_coin.update(level_info[c.CURRENT_TIME])
         if self.state == c.LOAD_SCREEN:
             self.update_text(self.stage_label2, level_info[c.LEVEL_NUM])
         if self.state == c.LEVEL:
-            if (level_info[c.CURRENT_TIME] - self.current_time) > 1000:
-                self.current_time = level_info[c.CURRENT_TIME]
+            self.step_count += 1
+            if self.step_count >= self.step_per_time:
                 self.time -= 1
-                self.update_text(self.clock_time_label, self.time, True)
+                self.step_count = 0
     
     def update_text(self, text, score, reset=False):
         if reset and len(text) > len(str(score)):
@@ -193,6 +198,3 @@ class Info():
         for label in label_list:
             for letter in label:
                 surface.blit(letter.image, letter.rect)
-
-
-

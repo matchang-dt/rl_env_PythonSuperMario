@@ -1,8 +1,15 @@
 __author__ = 'marble_xu'
 
+import sys
+import os
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
 from . import coin, stuff, powerup
 
 def create_brick(brick_group, item, level):
@@ -30,7 +37,7 @@ def create_brick(brick_group, item, level):
             
 def create_brick_list(brick_group, num, x, y, type, color, direction):
     ''' direction:horizontal, create brick from left to right, direction:vertical, create brick from up to bottom '''
-    size = 43 # 16 * c.BRICK_SIZE_MULTIPLIER is 43
+    size = 16
     tmp_x, tmp_y = x, y
     for i in range(num):
         if direction == c.VERTICAL:
@@ -41,7 +48,7 @@ def create_brick_list(brick_group, num, x, y, type, color, direction):
         
 class Brick(stuff.Stuff):
     def __init__(self, x, y, type, color=c.ORANGE, group=None, name=c.MAP_BRICK):
-        orange_rect = [(16, 0, 16, 16), (432, 0, 16, 16)]
+        orange_rect = [(208, 0, 16, 16), (432, 0, 16, 16)]
         green_rect = [(208, 32, 16, 16), (48, 32, 16, 16)]
         if color == c.COLOR_TYPE_ORANGE:
             frame_rect = orange_rect
@@ -49,7 +56,7 @@ class Brick(stuff.Stuff):
             frame_rect = green_rect
         stuff.Stuff.__init__(self, x, y, setup.GFX['tile_set'],
                         frame_rect, c.BRICK_SIZE_MULTIPLIER)
-
+        self.image.set_colorkey(c.NAVYBLUE)
         self.rest_height = y
         self.state = c.RESTING
         self.y_vel = 0

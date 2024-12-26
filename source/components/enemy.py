@@ -1,15 +1,23 @@
 __author__ = 'marble_xu'
 
 import math
-import pygame as pg
-from .. import setup, tools
-from .. import constants as c
+import sys
+import os
 
-ENEMY_SPEED = 1
+import pygame as pg
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
+
+ENEMY_SPEED = 0.5
 
 def create_enemy(item, level):
     dir = c.LEFT if item['direction'] == 0 else c.RIGHT
     color = item[c.COLOR]
+    id = item['id']
     if c.ENEMY_RANGE in item:
         in_range = item[c.ENEMY_RANGE]
         range_start = item['range_start']
@@ -20,29 +28,29 @@ def create_enemy(item, level):
 
     if item['type'] == c.ENEMY_TYPE_GOOMBA:
         sprite = Goomba(item['x'], item['y'], dir, color,
-            in_range, range_start, range_end)
+            in_range, range_start, range_end, id)
     elif item['type'] == c.ENEMY_TYPE_KOOPA:
         sprite = Koopa(item['x'], item['y'], dir, color,
-            in_range, range_start, range_end)
+            in_range, range_start, range_end, id)
     elif item['type'] == c.ENEMY_TYPE_FLY_KOOPA:
         isVertical = False if item['is_vertical'] == 0 else True
         sprite = FlyKoopa(item['x'], item['y'], dir, color,
-            in_range, range_start, range_end, isVertical)
+            in_range, range_start, range_end, isVertical, id)
     elif item['type'] == c.ENEMY_TYPE_PIRANHA:
         sprite = Piranha(item['x'], item['y'], dir, color,
-            in_range, range_start, range_end)
+            in_range, range_start, range_end, id)
     elif item['type'] == c.ENEMY_TYPE_FIRE_KOOPA:
         sprite = FireKoopa(item['x'], item['y'], dir, color,
-            in_range, range_start, range_end, level)
+            in_range, range_start, range_end, level, id)
     elif item['type'] == c.ENEMY_TYPE_FIRESTICK:
         '''use a number of fireballs to stimulate a firestick'''
         sprite = []
         num = item['num']
         center_x, center_y = item['x'], item['y']
         for i in range(num):
-            radius = i * 21 # 8 * 2.69 = 21
+            radius = i * 8
             sprite.append(FireStick(center_x, center_y, dir, color,
-                radius))
+                radius, id))
     return sprite
     
 class Enemy(pg.sprite.Sprite):
@@ -63,6 +71,7 @@ class Enemy(pg.sprite.Sprite):
         self.image = self.frames[self.frame_index]
         self.rect = self.image.get_rect()
         self.rect.x = x
+        self.real_x = x
         self.rect.bottom = y
         self.in_range = in_range
         self.range_start = range_start
@@ -70,6 +79,7 @@ class Enemy(pg.sprite.Sprite):
         self.isVertical = isVertical
         self.set_velocity()
         self.death_timer = 0
+        self.walk_step = 0
     
     def load_frames(self, sheet, frame_rect_list):
         for frame_rect in frame_rect_list:
@@ -106,7 +116,8 @@ class Enemy(pg.sprite.Sprite):
             self.revealing()
     
     def walking(self):
-        if (self.current_time - self.animate_timer) > 125:
+        self.walk_step += 1
+        if self.walk_step > 7:
             if self.direction == c.RIGHT:
                 if self.frame_index == 4:
                     self.frame_index += 1
@@ -117,7 +128,7 @@ class Enemy(pg.sprite.Sprite):
                     self.frame_index += 1
                 elif self.frame_index == 1:
                     self.frame_index = 0
-            self.animate_timer = self.current_time
+            self.walk_step = 0
     
     def falling(self):
         if self.y_vel < 10:
@@ -128,23 +139,24 @@ class Enemy(pg.sprite.Sprite):
 
     def death_jumping(self):
         self.rect.y += self.y_vel
-        self.rect.x += self.x_vel
+        self.real_x += self.x_vel
+        self.rect.x = round(self.real_x)
         self.y_vel += self.gravity
         if self.rect.y > c.SCREEN_HEIGHT:
             self.kill()
 
     def shell_sliding(self):
         if self.direction == c.RIGHT:
-            self.x_vel = 10
+            self.x_vel = 4
         else:
-            self.x_vel = -10
+            self.x_vel = -4
 
     def revealing(self):
         pass
 
     def start_death_jump(self, direction):
         self.y_vel = -8
-        self.x_vel = 2 if direction == c.RIGHT else -2
+        self.x_vel = 1 if direction == c.RIGHT else -1
         self.gravity = .5
         self.frame_index = 3
         self.state = c.DEATH_JUMP
@@ -153,7 +165,8 @@ class Enemy(pg.sprite.Sprite):
         self.image = self.frames[self.frame_index]
     
     def update_position(self, level):
-        self.rect.x += self.x_vel
+        self.real_x += self.x_vel
+        self.rect.x = round(self.real_x)
         self.check_x_collisions(level)
 
         if self.in_range and self.isVertical:
@@ -169,7 +182,7 @@ class Enemy(pg.sprite.Sprite):
             self.state != c.FLY):
             self.check_y_collisions(level)
         
-        if self.rect.x <= 0:
+        if self.rect.x < level.viewport.x - 32 or self.rect.x > level.viewport.right + 32:
             self.kill()
         elif self.rect.y > (level.viewport.bottom):
             self.kill()
@@ -184,6 +197,10 @@ class Enemy(pg.sprite.Sprite):
                 self.change_direction(c.LEFT)
         else:
             collider = pg.sprite.spritecollideany(self, level.ground_step_pipe_group)
+            if not collider:
+                collider = pg.sprite.spritecollideany(self, level.brick_group)
+            if not collider:
+                collider = pg.sprite.spritecollideany(self, level.box_group)
             if collider:
                 if self.direction == c.RIGHT:
                     self.rect.right = collider.rect.left
@@ -192,12 +209,21 @@ class Enemy(pg.sprite.Sprite):
                     self.rect.left = collider.rect.right
                     self.change_direction(c.RIGHT)
 
-        if self.state == c.SHELL_SLIDE:
-            enemy = pg.sprite.spritecollideany(self, level.enemy_group)
-            if enemy:
+        enemy = pg.sprite.spritecollideany(self, level.enemy_group)
+        if enemy:
+            if self.state == c.SHELL_SLIDE:
                 level.update_score(100, enemy, 0)
                 level.move_to_dying_group(level.enemy_group, enemy)
                 enemy.start_death_jump(self.direction)
+            elif self.id != enemy.id and self.state != c.DEATH_JUMP and enemy.state != c.DEATH_JUMP:
+                if self.rect.x < enemy.rect.x:
+                    self.rect.right = enemy.rect.x
+                    self.change_direction(c.LEFT)
+                    enemy.change_direction(c.RIGHT)
+                else:
+                    self.rect.left = enemy.rect.right
+                    self.change_direction(c.RIGHT)
+                    enemy.change_direction(c.LEFT)
 
     def change_direction(self, direction):
         self.direction = direction
@@ -227,13 +253,14 @@ class Enemy(pg.sprite.Sprite):
 
 class Goomba(Enemy):
     def __init__(self, x, y, direction, color, in_range,
-                range_start, range_end, name=c.GOOMBA):
+                range_start, range_end, id, name=c.GOOMBA):
         Enemy.__init__(self)
         frame_rect_list = self.get_frame_rect(color)
         self.setup_enemy(x, y, direction, name, setup.GFX[c.ENEMY_SHEET],
                     frame_rect_list, in_range, range_start, range_end)
+        self.id = id
         # dead jump image
-        self.frames.append(pg.transform.flip(self.frames[2], False, True))
+        self.frames.append(pg.transform.flip(self.frames[0], False, True))
         # right walk images
         self.frames.append(pg.transform.flip(self.frames[0], True, False))
         self.frames.append(pg.transform.flip(self.frames[1], True, False))
@@ -257,11 +284,12 @@ class Goomba(Enemy):
 
 class Koopa(Enemy):
     def __init__(self, x, y, direction, color, in_range,
-                range_start, range_end, name=c.KOOPA):
+                range_start, range_end, id, name=c.KOOPA):
         Enemy.__init__(self)
         frame_rect_list = self.get_frame_rect(color)
         self.setup_enemy(x, y, direction, name, setup.GFX[c.ENEMY_SHEET],
                     frame_rect_list, in_range, range_start, range_end)
+        self.id = id
         # dead jump image
         self.frames.append(pg.transform.flip(self.frames[2], False, True))
         # right walk images
@@ -292,11 +320,12 @@ class Koopa(Enemy):
 
 class FlyKoopa(Enemy):
     def __init__(self, x, y, direction, color, in_range, 
-                range_start, range_end, isVertical, name=c.FLY_KOOPA):
+                range_start, range_end, isVertical, id, name=c.FLY_KOOPA):
         Enemy.__init__(self)
         frame_rect_list = self.get_frame_rect(color)
         self.setup_enemy(x, y, direction, name, setup.GFX[c.ENEMY_SHEET], 
                     frame_rect_list, in_range, range_start, range_end, isVertical)
+        self.id = id
         # dead jump image
         self.frames.append(pg.transform.flip(self.frames[2], False, True))
         # right walk images
@@ -326,12 +355,13 @@ class FlyKoopa(Enemy):
 
 class FireKoopa(Enemy):
     def __init__(self, x, y, direction, color, in_range,
-                range_start, range_end, level, name=c.FIRE_KOOPA):
+                range_start, range_end, level, id, name=c.FIRE_KOOPA):
         Enemy.__init__(self)
         frame_rect_list = [(2, 210, 32, 32), (42, 210, 32, 32),
                             (82, 210, 32, 32), (122, 210, 32, 32)]
         self.setup_enemy(x, y, direction, name, setup.GFX[c.ENEMY_SHEET], 
                     frame_rect_list, in_range, range_start, range_end)
+        self.id = id
         # right walk images
         self.frames.append(pg.transform.flip(self.frames[0], True, False))
         self.frames.append(pg.transform.flip(self.frames[1], True, False))
@@ -382,12 +412,13 @@ class FireKoopa(Enemy):
             self.level.enemy_group.add(Fire(self.rect.x, self.rect.bottom-20, self.direction))
 
 class Fire(Enemy):
-    def __init__(self, x, y, direction, name=c.FIRE):
+    def __init__(self, x, y, direction, id, name=c.FIRE):
         Enemy.__init__(self)
         frame_rect_list = [(101, 253, 23, 8), (131, 253, 23, 8)]
         in_range, range_start, range_end = False, 0, 0
         self.setup_enemy(x, y, direction, name, setup.GFX[c.ENEMY_SHEET], 
                     frame_rect_list, in_range, range_start, range_end)
+        self.id = id
         # right images
         self.frames.append(pg.transform.flip(self.frames[0], True, False))
         self.frames.append(pg.transform.flip(self.frames[1], True, False))
@@ -406,11 +437,12 @@ class Fire(Enemy):
 
 class Piranha(Enemy):
     def __init__(self, x, y, direction, color, in_range, 
-                range_start, range_end, name=c.PIRANHA):
+                range_start, range_end, id, name=c.PIRANHA):
         Enemy.__init__(self)
         frame_rect_list = self.get_frame_rect(color)
         self.setup_enemy(x, y, direction, name, setup.GFX[c.ENEMY_SHEET], 
                     frame_rect_list, in_range, range_start, range_end)
+        self.id = id
         self.state = c.REVEAL
         self.y_vel = 1
         self.wait_timer = 0
@@ -463,7 +495,7 @@ class Piranha(Enemy):
         self.kill()
 
 class FireStick(pg.sprite.Sprite):
-    def __init__(self, center_x, center_y, direction, color, radius, name=c.FIRESTICK):
+    def __init__(self, center_x, center_y, direction, color, radius, id, name=c.FIRESTICK):
         '''the firestick will rotate around the center of a circle'''
         pg.sprite.Sprite.__init__(self)
 
@@ -483,6 +515,7 @@ class FireStick(pg.sprite.Sprite):
         self.center_y = center_y
         self.radius = radius
         self.angle = 0
+        self.id = id
 
     def load_frames(self, sheet, frame_rect_list):
         for frame_rect in frame_rect_list:

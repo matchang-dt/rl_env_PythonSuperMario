@@ -42,12 +42,14 @@
         ]
     },
     "speed":{
-        "max_walk_speed":6,
-        "max_run_speed":12,
-        "max_y_velocity":11,
-        "walk_accel":0.15,
-        "run_accel":0.3,
-        "jump_velocity":-10.5
+        "initial_speed":0,
+        "max_walk_speed":1.5,
+        "max_run_speed":3,
+        "max_y_velocity":8,
+        "walk_accel":0.05,
+        "run_accel":0.1,
+        "break_accel":0.05,
+        "jump_velocity":-4
     }
     
 }

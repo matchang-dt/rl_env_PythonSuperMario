@@ -1,8 +1,15 @@
 __author__ = 'marble_xu'
 
+import sys
+import os
+
 import pygame as pg
-from .. import setup, tools
-from .. import constants as c
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd,".."))
+
+import setup, tools
+import constants as c
 
 class Coin(pg.sprite.Sprite):
     def __init__(self, x, y, score_group):

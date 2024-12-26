@@ -1,9 +1,15 @@
 __author__ = 'marble_xu'
 
 import os
+import sys
+
 import pygame as pg
-from . import constants as c
-from . import tools
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd))
+
+import constants as c
+import tools
 
 pg.init()
 pg.event.set_allowed([pg.KEYDOWN, pg.KEYUP, pg.QUIT])

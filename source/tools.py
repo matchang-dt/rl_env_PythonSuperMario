@@ -1,8 +1,13 @@
 __author__ = 'marble_xu'
 
-import os
-import pygame as pg
 from abc import ABC, abstractmethod
+import os
+import sys
+
+import pygame as pg
+
+cwd = os.path.dirname(__file__)
+sys.path.append(os.path.join(cwd))
 
 keybinding = {
     'action':pg.K_s,
@@ -43,6 +48,7 @@ class Control():
         self.state_dict = {}
         self.state_name = None
         self.state = None
+        self.key_list = [pg.K_LEFT, pg.K_DOWN, pg.K_RIGHT, pg.K_s, pg.K_a]
     
     def setup_states(self, state_dict, start_state):
         self.state_dict = state_dict
@@ -77,6 +83,17 @@ class Control():
             pg.display.update()
             self.clock.tick(self.fps)
 
+    # def step(self, action):
+    #     for event in pg.event.get():
+    #         if event.type == pg.QUIT:
+    #             self.done = True
+    #     self.keys = pg.key.get_pressed()
+    #     idx = 0
+    #     for key_idx in self.key_list:
+    #         self.keys[key_idx] = action[idx]
+    #         idx += 1
+    #     self.update()
+
 def get_image(sheet, x, y, width, height, colorkey, scale):
         image = pg.Surface([width, height])
         rect = image.get_rect()
@@ -90,10 +107,11 @@ def get_image(sheet, x, y, width, height, colorkey, scale):
 
 def load_all_gfx(directory, colorkey=(255,0,255), accept=('.png', '.jpg', '.bmp', '.gif')):
     graphics = {}
-    for pic in os.listdir(directory):
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), directory)
+    for pic in os.listdir(path):
         name, ext = os.path.splitext(pic)
         if ext.lower() in accept:
-            img = pg.image.load(os.path.join(directory, pic))
+            img = pg.image.load(os.path.join(path, pic))
             if img.get_alpha():
                 img = img.convert_alpha()
             else:
