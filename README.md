@@ -6,8 +6,19 @@ A improved supermario game based on https://github.com/marblexu/PythonSuperMario
 * Omitted information displayed on top (score, coins, etc) and the production of reaching the goal, because this is a reinforcement learning environment.
 * Fixed many in-game behaviors (refer to the bottom).
 
+
+# Demo
+Left: Run trained agent in Level 1-1, Right: Run the same agent in modified level
+
+<video width="480" height="360" controls>
+  <source src="resources/demo/L1-1full.mp4" type="video/mp4">
+</video>
+<video width="480" height="360" controls>
+  <source src="resources/demo/Modified_L1-1.mp4" type="video/mp4">
+</video>
+
 # Requirement
-\* In particular, later versions of OpenAI Gym and Stable Baselines3 do not work.
+\* In particular, later versions of Python, OpenAI Gym and Stable Baselines3 do not work.
 * Python 3.9
 * Python-Pygame 3.2
 * Python-Numpy 1.26
@@ -56,6 +67,7 @@ for i in range(test_episodes):
 * Made speed of time decrease faster
 * Aspect and resolution of display
 * Changed animation control from real-time-based to frame-based
+* Coloring of Goomba
 * Fixed viewport misalignment in various situations (e.g. during transformation)
 * Changed so that which power-up item appears depends on Mario's status
 * Jump height during dash jump
@@ -64,7 +76,7 @@ for i in range(test_episodes):
 * Changed fireball firing from a cool time system to a limit of two shots on screen
 * Disabled firing fireball during crouching
 * Enabled crouching jump
-* Made hitbox of Mario a bit narrower
+* Made hitbox of Mario a bit narrower (in general action games, hitbox is narrower than appearance)
 * Made enemies turn their direction when they contact another enemy
 * Enabled sliding during crouching after dush
 * Trajectry of fireballs
@@ -72,9 +84,3 @@ for i in range(test_episodes):
 * use LEFT/RIGHT/DOWN key to control player
 * use key 'a' to jump
 * use key 's' to shoot firewall or run -->
-
-<!-- # Demo
-![level_1_1](https://raw.githubusercontent.com/marblexu/PythonSuperMario/master/resources/demo/level_1_1.png)
-![level_1_2](https://raw.githubusercontent.com/marblexu/PythonSuperMario/master/resources/demo/level_1_2.png)
-![level_1_3](https://raw.githubusercontent.com/marblexu/PythonSuperMario/master/resources/demo/level_1_3.png)
-![level_1_4](https://raw.githubusercontent.com/marblexu/PythonSuperMario/master/resources/demo/level_1_4.png) -->
