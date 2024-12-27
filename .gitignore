@@ -3,3 +3,5 @@ __pychace__/
 components/__pychace__/
 states/__pychace__/
 test_psmenv.py
+resources/demo/demo_origin/
+resources/demo/palette.png

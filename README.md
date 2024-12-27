@@ -10,12 +10,8 @@ A improved supermario game based on https://github.com/marblexu/PythonSuperMario
 # Demo
 Left: Run trained agent in Level 1-1, Right: Run the same agent in modified level
 
-<video width="480" height="360" controls>
-  <source src="https://github.com/matchang-dt/rl_env_PythonSuperMario/raw/refs/heads/master/resources/demo/L1-1full.mp4" type="video/mp4">
-</video>
-<video width="480" height="360" controls>
-  <source src="https://github.com/matchang-dt/rl_env_PythonSuperMario/raw/refs/heads/master/resources/demo/Modified_L1-1.mp4" type="video/mp4">
-</video>
+![demo](resources/demo/L1-1full.gif)
+![demo](resources/demo/Modified_L1-1.gif)
 
 # Requirement
 \* In particular, later versions of Python, OpenAI Gym and Stable Baselines3 do not work.
